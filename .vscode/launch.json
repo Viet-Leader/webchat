@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Server",
+      "program": "${workspaceFolder}/WebChatApp/server.js",  // Đường dẫn đến server.js
+      "cwd": "${workspaceFolder}/WebChatApp",  // ← CWD chính: Set đúng thư mục project
+      "console": "integratedTerminal",  // Dùng terminal tích hợp
+      "env": { "NODE_ENV": "development" },  // Tùy chọn: Env vars bổ sung
+      "runtimeArgs": ["--experimental-network-inspection"]  // Nếu cần flag của bạn
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Đăng nhập</title>
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 100px; }
+    form { display: flex; flex-direction: column; width: 300px; gap: 10px; }
+    input, button { padding: 8px; font-size: 14px; }
+    button { background-color: #0078ff; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #005ecc; }
+  </style>
+</head>
+<body>
+  <h2>Đăng nhập</h2>
+  <form id="loginForm">
+    <input type="text" id="username" placeholder="Tên đăng nhập" required />
+    <input type="password" id="password" placeholder="Mật khẩu" required />
+    <button type="submit">Đăng nhập</button>
+  </form>
+  <p>Chưa có tài khoản? <a href="register.html">Đăng ký</a></p>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await res.json();
+      console.log('Dữ liệu từ server:', data); // <<< THÊM DÒNG NÀY
+      alert(data.message);
+
+      if (res.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        window.location.href = 'index.html'; // chuyển sang trang chat chính
+      }
+    });
+  </script>
+</body>
+</html>
