@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Đăng ký tài khoản</title>
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 100px; }
+    form { display: flex; flex-direction: column; width: 300px; gap: 10px; }
+    input, button { padding: 8px; font-size: 14px; }
+    button { background-color: #0078ff; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #005ecc; }
+  </style>
+</head>
+<body>
+  <h2>Đăng ký tài khoản</h2>
+  <form id="registerForm">
+    <input type="text" id="fullname" placeholder="Họ tên" required />
+    <input type="text" id="username" placeholder="Tên đăng nhập" required />
+    <input type="password" id="password" placeholder="Mật khẩu" required />
+    <button type="submit">Đăng ký</button>
+  </form>
+  <p>Đã có tài khoản? <a href="login.html">Đăng nhập</a></p>
+
+  <script>
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fullname = document.getElementById('fullname').value;
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullname, username, password }),
+      });
+
+      const data = await res.json();
+      alert(data.message);
+      if (res.ok) window.location.href = 'login.html';
+    });
+  </script>
+</body>
+</html>
