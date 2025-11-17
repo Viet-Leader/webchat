@@ -1,0 +1,90 @@
+body {
+  background: #f0f2f5;
+  font-family: Arial, sans-serif;
+}
+
+.edit-card {
+  width: 420px;
+  background: white;
+  margin: 30px auto;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.title {
+  text-align: center;
+  font-size: 22px;
+  margin-bottom: 20px;
+}
+
+label {
+  font-weight: bold;
+  margin-top: 10px;
+  display: block;
+}
+
+/* ⭐ Tất cả input đồng kích thước */
+input, textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  margin-top: 6px;
+  box-sizing: border-box;
+}
+
+/* ⭐ Fix riêng input file cho đều */
+input[type="file"] {
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+textarea {
+  height: 80px;
+  resize: none;
+}
+
+/* ⭐ Radio Nam/Nữ + căn chỉnh lại */
+.gender-row {
+  display: flex;
+  align-items: center;
+  gap: 35px;        /* rộng ra cho đều */
+  margin: 10px 0;
+}
+
+.gender-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: normal;
+}
+
+.gender-row input[type="radio"] {
+  transform: translateY(-1px);   /* chỉnh cao lên 1px cho cân */
+}
+
+/* ⭐ Nút */
+.save-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 20px;
+  background: #1877f2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.cancel-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  background: gray;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}

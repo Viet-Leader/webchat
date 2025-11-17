@@ -1,0 +1,109 @@
+body {
+  background: #f0f2f5;
+  font-family: Arial, sans-serif;
+}
+
+.profile-card {
+  width: 420px;
+  background: white;
+  margin: 30px auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.cover-container {
+  height: 170px;
+  overflow: hidden;
+}
+
+.cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-container {
+  text-align: center;
+  margin-top: -60px;
+}
+
+.avatar-img {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  border: 5px solid white;
+  object-fit: cover;
+}
+
+.fullname {
+  text-align: center;
+  margin: 10px 0;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.info-box {
+  padding: 20px;
+  line-height: 28px;
+}
+
+.edit-btn {
+  width: 90%;
+  margin: 10px 5%;
+  padding: 12px;
+  background: #1877f2;
+  color: white;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+.logout-btn {
+  width: 90%;
+  margin: 10px 5%;
+  padding: 12px;
+  background: red;
+  color: white;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+.bio-text {
+  text-align: center;
+  margin-top: -5px;
+  font-size: 15px;
+  color: #555;
+  padding: 0 20px;
+}
+.profile-header { 
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.profile-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Nút quay lại (đã sửa trắng + viền mảnh) */
+.back-btn {
+  background: #ffffff;          /* nền TRẮNG */
+  border: 1px solid #ddd;       /* viền xám nhạt */
+  padding: 6px 10px;
+  border-radius: 8px;           /* bo góc như cũ */
+  cursor: pointer;
+  font-size: 16px;
+  transition: 0.2s;
+  color: #333;                  /* màu mũi tên */
+}
+
+.back-btn:hover {
+  background: #f8f8f8;          /* hover trắng nhẹ */
+}
