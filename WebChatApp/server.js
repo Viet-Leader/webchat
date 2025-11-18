@@ -1,45 +1,147 @@
 require('dotenv').config();
+if (!process.env.JWT_SECRET) {
+  console.error('🚨 JWT_SECRET missing! Check .env file.');
+  process.exit(1);
+}
 
-const express = require("express");
-const http = require("http");
-const cors = require("cors");
-const path = require("path");
+const express = require('express');
+const http = require('http');
+const cors = require('cors');
+const { Server } = require('socket.io');
+const path = require('path');
+const db = require('./config/db');
+
+const friendRoutes = require('./routes/friends');
+const messageRoutes = require('./routes/messages');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 const server = http.createServer(app);
 
-// =============================
-// DEBUG ENV
-// =============================
-console.log("🔑 JWT_SECRET:", process.env.JWT_SECRET || "⚠️ Not using JWT");
-
-// =============================
-// MIDDLEWARE
-// =============================
-
-// ⚡ FIX LỖI 413 — TĂNG GIỚI HẠN PAYLOAD
+// --- Middleware ---
 app.use(cors());
 app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ extended: true, limit: "200mb" }));
 
-// Serve giao diện
-app.use(express.static(path.join(__dirname, "public")));
+// --- Static files ---
+const publicPath = path.join(__dirname, 'public');
+app.use(express.static(publicPath));
 
-// Trang mặc định → login
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "login.html"));
+// --- Root fallback ---
+app.get('/', (req, res) => {
+  res.sendFile(path.join(publicPath, 'login.html'));
 });
 
-// =============================
-// ROUTES API
-// =============================
-app.use("/api/auth", require("./routes/auth"));
-app.use("/api/users", require("./routes/users"));
+// --- API routes ---
+// Pass io instance to routes để có thể gửi real-time notifications
+app.use('/api/auth', authRoutes);
+app.use('/api/friends', (req, res, next) => {
+  req.io = io; // Thêm io vào request để controller có thể dùng
+  next();
+}, friendRoutes);
+app.use('/api/messages', messageRoutes);
 
-// =============================
-// START SERVER
-// =============================
+// --- Socket.io ---
+const onlineUsers = new Map(); // userId -> socketId
+
+io.on('connection', (socket) => {
+  console.log('Socket connected', socket.id);
+
+  // Register user after socket connect
+  socket.on('registerSocket', (payload) => {
+    if (payload?.userId) {
+      onlineUsers.set(String(payload.userId), socket.id);
+      socket.join(String(payload.userId)); // join room
+      console.log('Registered socket for user', payload.userId, '=>', socket.id);
+    }
+  });
+
+  socket.on('sendMessage', (data) => {
+    const { sender_id, receiver_id, message } = data;
+
+    // 1. Kiểm tra dữ liệu
+    if (!sender_id || !receiver_id || !message) {
+      console.log("Missing fields:", data);
+      return socket.emit('error', { message: 'Missing fields' });
+    }
+
+    // Normalize tin nhắn: loại bỏ ký tự xuống dòng không mong muốn
+    let normalizedMessage = String(message)
+      .replace(/\r\n/g, ' ') // Thay thế Windows newline (CRLF)
+      .replace(/\n/g, ' ') // Thay thế Unix newline (LF)
+      .replace(/\r/g, ' ') // Thay thế Mac newline (CR)
+      .replace(/[\u2028\u2029]/g, ' ') // Thay thế Unicode line/paragraph separator
+      .replace(/\s+/g, ' ') // Thay thế nhiều khoảng trắng bằng 1 khoảng trắng
+      .replace(/[\u200B-\u200D\uFEFF]/g, '') // Loại bỏ zero-width characters
+      .trim();
+    
+    if (!normalizedMessage) {
+      return socket.emit('error', { message: 'Tin nhắn không hợp lệ' });
+    }
+
+    // 2. Kiểm tra là bạn bè trước khi gửi
+    const checkFriendSql = `SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ? AND status = 'accepted' LIMIT 1`;
+    db.query(checkFriendSql, [sender_id, receiver_id], (err, friendRows) => {
+      if (err) {
+        console.log("Friend check error:", err);
+        return socket.emit('error', { message: 'Friend check error' });
+      }
+
+      if (friendRows.length === 0) {
+        console.log("Not friends:", sender_id, receiver_id);
+        return socket.emit('error', { message: 'Chưa là bạn bè' });
+      }
+
+      // 3. Lưu vào DB (sử dụng normalizedMessage)
+      db.query(
+        "INSERT INTO messages (sender_id, receiver_id, message) VALUES (?, ?, ?)",
+        [sender_id, receiver_id, normalizedMessage],
+        (err2, result) => {
+          if (err2) {
+            console.log("DB Error:", err2);
+            return socket.emit('error', { message: 'DB error' });
+          }
+
+          const payload = {
+            id: result.insertId,
+            sender_id,
+            receiver_id,
+            message: normalizedMessage,
+            created_at: new Date()
+          };
+
+          // Debug: Log tin nhắn trước khi gửi
+          console.log(`📨 Message sent from ${sender_id} to ${receiver_id}:`, {
+            original: message,
+            normalized: normalizedMessage,
+            savedToDB: normalizedMessage
+          });
+
+          // 4. Gửi cho người nhận (phải JOIN room trước)
+          io.to(String(receiver_id)).emit('receiveMessage', payload);
+          
+          // 5. Gửi lại cho người gửi để hiển thị ngay
+          io.to(String(sender_id)).emit('messageSent', payload);
+        }
+      );
+    });
+  });
+
+  socket.on('join', (userId) => {
+    socket.join(String(userId));
+  });
+  socket.on('disconnect', () => {
+    for (const [userId, sid] of onlineUsers.entries()) {
+      if (sid === socket.id) onlineUsers.delete(userId);
+    }
+    console.log('Socket disconnected', socket.id);
+  });
+});
+
+// --- Start server ---
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces để các máy khác có thể kết nối
+server.listen(PORT, HOST, () => {
+  console.log(`🚀 Server running on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+  console.log(`📡 Socket.io ready for connections from any device`);
 });
