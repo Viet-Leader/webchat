@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Hồ sơ cá nhân</title>
+  <link rel="stylesheet" href="./css/profile.css">
+</head>
+
+<body>
+
+<div class="profile-card">
+
+<div class="profile-header">
+  <button class="back-btn" onclick="location.href='/'">⬅</button>
+  <h3>Thông tin tài khoản</h3>
+</div>
+
+
+  <!-- Cover -->
+  <div class="cover-container">
+    <img class="cover-img" src="https://i.imgur.com/FU7q5.jpg">
+  </div>
+
+  <!-- Avatar -->
+  <div class="avatar-container">
+    <img id="avatarImg" class="avatar-img" alt="Avatar">
+  </div>
+
+  <!-- TÊN -->
+  <h2 id="fullnameDisplay" class="fullname"></h2>
+  <!-- TIỂU SỬ -->
+<p id="bioDisplay" class="bio-text"></p>
+
+  <!-- INFO -->
+  <div class="info-box">
+    <p><b>Email:</b> <span id="emailDisplay">...</span></p>
+    <p><b>Giới tính:</b> <span id="genderDisplay">...</span></p>
+    <p><b>Ngày sinh:</b> <span id="birthdayDisplay">...</span></p>
+  </div>
+
+  <button class="edit-btn" onclick="window.location.href='edit-profile.html'">
+    ✏️ Cập nhật
+  </button>
+
+</div>
+
+<script src="./js/profile.js"></script>
+
+</body>
+</html>
