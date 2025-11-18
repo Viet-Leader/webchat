@@ -17,6 +17,12 @@ const authRoutes = require('./routes/auth');
 
 const app = express();
 const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {  // Config CORS cho Socket để frontend connect dễ (tránh lỗi cross-origin)
+    origin: process.env.NODE_ENV === 'development' ? '*' : 'http://localhost:3001',  // Thay 'http://localhost:3000' bằng frontend URL nếu khác
+    methods: ['GET', 'POST']
+  }
+});
 
 // --- Middleware ---
 app.use(cors());
@@ -35,6 +41,7 @@ app.get('/', (req, res) => {
 // --- API routes ---
 // Pass io instance to routes để có thể gửi real-time notifications
 app.use('/api/auth', authRoutes);
+app.use("/api/users", require("./routes/users"));
 app.use('/api/friends', (req, res, next) => {
   req.io = io; // Thêm io vào request để controller có thể dùng
   next();
