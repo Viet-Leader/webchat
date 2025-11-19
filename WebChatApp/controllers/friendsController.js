@@ -3,14 +3,73 @@ const db = require('../config/db');
 // Search users by keyword (exclude current user)
 exports.searchUsers = (req, res) => {
   const keyword = req.query.q || '';
-  const exclude = req.query.exclude || 0;
-  const sql = `SELECT id, username, fullname, avatar FROM users 
-               WHERE (username LIKE ? OR fullname LIKE ?) AND id != ? LIMIT 50`;
-  db.query(sql, [`%${keyword}%`, `%${keyword}%`, exclude], (err, results) => {
+  const currentId = Number(req.query.exclude || 0);
+
+ const sql = `
+    SELECT 
+      u.id, u.username, u.fullname, u.avatar,
+
+      /* Trạng thái A → B (người đang search → người tìm thấy) */
+      (
+        SELECT status 
+        FROM friends 
+        WHERE user_id = ? AND friend_id = u.id
+        LIMIT 1
+      ) AS relation_from_A,
+
+      /* Trạng thái B → A (người tìm thấy → người đang search) */
+      (
+        SELECT status 
+        FROM friends 
+        WHERE user_id = u.id AND friend_id = ?
+        LIMIT 1
+      ) AS relation_from_B
+
+    FROM users u
+    WHERE (u.username LIKE ? OR u.fullname LIKE ?)
+      AND u.id != ?
+    LIMIT 50
+`;
+
+  db.query(sql, [
+    currentId,  
+    currentId,  
+    `%${keyword}%`, 
+    `%${keyword}%`, 
+    currentId
+  ], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(results);
+
+    const processed = rows.map(u => {
+      // ============================
+      // QUY TẮC XÁC ĐỊNH TRẠNG THÁI
+      // ============================
+
+      let relationship = "none";
+
+      if (u.relation_from_A === "accepted" || u.relation_from_B === "accepted") {
+        relationship = "friend";
+      }
+      else if (u.relation_from_A === "pending") {
+        relationship = "pending_sent";      // Tôi đã gửi
+      }
+      else if (u.relation_from_B === "pending") {
+        relationship = "pending_received";  // Người ta gửi cho tôi
+      }
+
+      return {
+        id: u.id,
+        username: u.username,
+        fullname: u.fullname,
+        avatar: u.avatar,
+        relationship
+      };
+    });
+
+    res.json(processed);
   });
 };
+
 
 // Send friend request: create both directions (A->B pending, B->A pending)
 // Use INSERT IGNORE to avoid duplicates (requires unique index on (user_id,friend_id))
@@ -147,3 +206,71 @@ exports.getFriendRequests = (req, res) => {
     res.json(rows);
   });
 };
+// Người nhận từ chối yêu cầu kết bạn
+exports.rejectFriendRequest = (req, res) => {
+  const { user_id, friend_id } = req.body;
+
+  const sql = `
+    DELETE FROM friends
+    WHERE user_id = ? AND friend_id = ? AND status = 'pending'
+  `;
+
+  db.query(sql, [friend_id, user_id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    if (req.io) {
+      req.io.to(String(friend_id)).emit("friendRequestRejected", {
+        sender_id: friend_id
+      });
+    }
+
+    return res.json({
+      message: "Đã từ chối yêu cầu",
+      relationship: "none"
+    });
+  });
+};
+exports.cancelFriendRequest = (req, res) => {
+  const { user_id, friend_id } = req.body;
+
+  const sql = `
+    DELETE FROM friends
+    WHERE user_id = ? AND friend_id = ? AND status = 'pending'
+  `;
+
+  db.query(sql, [user_id, friend_id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    if (req.io) {
+      req.io.to(String(friend_id)).emit("friendRequestCanceled", {
+        sender_id: user_id
+      });
+    }
+
+    return res.json({
+      message: "Đã hủy lời mời",
+      relationship: "none"
+    });
+  });
+};
+exports.unfriend = (req, res) => {
+  const { user_id, friend_id } = req.body;
+
+  const sql = `
+    DELETE FROM friends
+    WHERE (user_id = ? AND friend_id = ?)
+       OR (user_id = ? AND friend_id = ?)
+  `;
+
+  db.query(sql, [user_id, friend_id, friend_id, user_id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    if (req.io) {
+      req.io.to(String(friend_id)).emit("unfriended", { user_id });
+      req.io.to(String(user_id)).emit("friendListUpdated", {});
+    }
+
+    return res.json({ message: "Đã hủy bạn bè" });
+  });
+};
+
