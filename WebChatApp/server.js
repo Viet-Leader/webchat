@@ -47,7 +47,47 @@ app.use('/api/friends', (req, res, next) => {
   next();
 }, friendRoutes);
 app.use('/api/messages', messageRoutes);
+// THÊM ROUTE PROFILE MỚI (tạm thời ở đây, sau migrate sang routes/users)
+app.get('/api/user/profile', (req, res) => {
+  console.log('🔍 API /profile called with userId:', req.query.userId); // Debug log
 
+  const userId = req.query.userId;
+  if (!userId) {
+    return res.status(400).json({ error: 'Thiếu userId trong query' });
+  }
+
+  // Query DB: Lấy username, fullname, avatar (giả sử bảng users có cột id, username, fullname, avatar)
+  // Avatar: Hỗ trợ base64 (như profile.js) hoặc path file
+  const sql = 'SELECT username, fullname, avatar FROM users WHERE id = ?';
+  db.query(sql, [userId], (err, results) => {
+    if (err) {
+      console.error('❌ DB query error in /profile:', err);
+      return res.status(500).json({ error: 'Lỗi truy vấn DB' });
+    }
+    if (results.length === 0) {
+      console.error('❌ User không tồn tại:', userId);
+      return res.status(404).json({ error: 'User không tồn tại' });
+    }
+
+    const user = results[0];
+    let avatar = user.avatar;
+
+    // Xử lý avatar:
+    // - Nếu base64 (data:image...), trả nguyên
+    // - Nếu path file (ví dụ: /img/avatars/1.png), thêm full URL
+    // - Nếu null, để null (frontend fallback)
+    if (avatar && !avatar.startsWith('data:image') && avatar.startsWith('/')) {
+      avatar = `http://localhost:3001${avatar}`; // Port 3001 từ server của bạn
+    }
+
+    // Trả JSON khớp với frontend (scripts.js expect username/fullname, avatar)
+    res.json({
+      username: user.username,
+      fullname: user.fullname || user.username,
+      avatar: avatar
+    });
+  });
+});
 // --- Socket.io ---
 const onlineUsers = new Map(); // userId -> socketId
 
