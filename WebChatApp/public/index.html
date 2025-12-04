@@ -29,15 +29,17 @@
 
         <div class="col-auto">
           <div class="dropdown">
-            <a class="d-flex align-items-center text-decoration-none dropdown-toggle"
-               href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <!-- Thêm avatar ở đây -->
-     <img id="userAvatar" src="/img/default.png" alt="Avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 12px;">
+            <a class="d-flex align-items-center text-decoration-none dropdown-toggle user-profile"
+              href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              
+              <!-- Avatar mới thêm -->
+              <img id="userAvatar" src="/img/default.png" alt="Avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 12px;">
             <div class="flex-grow-1">
               <h3 class="mb-0 username-display" style="font-size: 1rem; font-weight: 500;">Đang tải...</h3>
             </div>
             <i class="bi bi-chevron-down ms-1"></i>
           </a>
+
             <ul class="dropdown-menu dropdown-menu-end">
               <li><a class="dropdown-item" href="profile.html"><i class="bi bi-person me-2"></i>Thông tin cá nhân</a></li>
               <li><hr class="dropdown-divider"></li>
@@ -181,23 +183,24 @@
   </section>
 
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script>
-    function confirmLogout(e) {
-      e.preventDefault();
-      if (confirm("Bạn có chắc chắn muốn đăng xuất?")) {
-        localStorage.clear();
-        window.location.href = 'login.html';
-      }
+<script>
+  function confirmLogout(e) {
+    e.preventDefault();
+    if (confirm("Bạn có chắc chắn muốn đăng xuất?")) {
+      localStorage.clear();
+      window.location.href = 'login.html';
     }
-  </script>
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="js/scripts.js"></script>
-  <script>
-          document.addEventListener("click", function (e) {
+  }
+</script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/scripts.js"></script>
+<script>
+  document.addEventListener("click", function (e) {
     if (e.target.matches("a[href='#']")) {
-        e.preventDefault();
+      e.preventDefault();
     }
-});
+  });
+</script>
 </script>
 </body>
 </html>

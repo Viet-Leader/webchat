@@ -56,6 +56,50 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // --- BẮT ĐẦU ĐOẠN CODE TYPING CẦN THÊM ---
+  // --- DEBUG TYPING FEATURE ---
+  const msgInputForTyping = document.getElementById('message-input');
+  
+  if (msgInputForTyping) {
+    console.log("✅ Đã tìm thấy ô nhập liệu, đang gắn sự kiện typing..."); // DEBUG 1
+
+    msgInputForTyping.addEventListener('input', () => {
+      console.log("⌨️ Sự kiện input đã kích hoạt!"); // DEBUG 2
+
+      // Kiểm tra xem đang chat với ai
+      if (!window.currentReceiverId) {
+        console.warn("⚠️ Chưa có ReceiverId! Bạn đã click vào bạn bè chưa?"); 
+        return;
+      }
+
+      console.log(`📤 Đang gửi typing tới User ID: ${window.currentReceiverId}`); // DEBUG 3
+
+      // Gửi đi
+      if (socket && socket.connected) {
+        socket.emit('typing', {
+          sender_id: window.currentSenderId,
+          receiver_id: window.currentReceiverId,
+          sender_name: window.currentUserName 
+        });
+      } else {
+        console.error("❌ Socket chưa kết nối!");
+      }
+
+      // Xử lý timeout (giữ nguyên logic cũ)
+      if (window.typingTimeout) clearTimeout(window.typingTimeout);
+      window.typingTimeout = setTimeout(() => {
+        console.log("🛑 Gửi lệnh stop typing"); // DEBUG 4
+        socket.emit('stopTyping', {
+          sender_id: window.currentSenderId,
+          receiver_id: window.currentReceiverId
+        });
+      }, 1000);
+    });
+  } else {
+    console.error("❌ KHÔNG tìm thấy ô nhập liệu có id='message-input'!"); 
+  }
+
+  // --- KẾT THÚC ĐOẠN CODE TYPING ---
   const searchInput = document.querySelector('.msg-search input');
   if (searchInput) {
     searchInput.addEventListener('keyup', async () => {
@@ -73,76 +117,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   attachFriendClickListener();
   attachAcceptRequestListener();
   attachAddFriendListener();
+
 });
-
 // Sửa hàm loadFriends (gọi /api/friends/list/:userId)
-async function loadFriends() {
-  const res = await fetch(`/api/friends/list/${window.currentSenderId}`);
-  const friends = await res.json().catch(() => ([]));
-  const listEl = document.getElementById('chat-list-open');
-  if (!listEl) return;
-
-  listEl.innerHTML = '';
-
-  if (friends.length === 0) {
-    listEl.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Chưa có bạn bè</p>';
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-
-  friends.forEach(f => {
-    const a = document.createElement('a');
-    a.href = '#';
-    a.className = 'd-flex align-items-center friend-item';
-    a.dataset.friendId = f.id;
-    a.dataset.friendName = f.fullname || f.username;
-    a.dataset.friendAvatar = f.avatar || '';   // <==== THÊM DÒNG NÀY
-    a.style.textDecoration = 'none';
-    a.style.padding = '10px 12px';
-    a.style.marginBottom = '8px';
-    a.style.borderRadius = '8px';
-
-    const avatarEl = document.createElement('img');
-    avatarEl.src = f.avatar || '/img/default.png';
-    avatarEl.style.width = "40px";
-    avatarEl.style.height = "40px";
-    avatarEl.style.borderRadius = "50%";
-    avatarEl.style.objectFit = "cover";
-
-    const div = document.createElement('div');
-    div.style.cssText = 'flex: 1; min-width: 0;';
-    div.innerHTML = `
-      <h6 style="margin: 0; color: #222; font-weight: 600; font-size: 14px;">${f.fullname || f.username}</h6>
-      <p style="margin: 0; color: #999; font-size: 12px;">${f.username}</p>
-    `;
-
-    a.appendChild(avatarEl);
-    a.appendChild(div);
-    fragment.appendChild(a);
-  });
-
-  listEl.appendChild(fragment);
-
-  // Populate window.friendList từ friends
-  window.friendList = friends.reduce((acc, f) => {
-    acc[f.id] = { 
-      name: f.fullname || f.username, 
-      avatar: f.avatar || '/img/default.png' 
-    };
-    return acc;
-  }, {});
-
-  // Populate window.messageSenders (nếu chưa có)
-  friends.forEach(f => {
-    if (!window.messageSenders[f.id]) {
-      window.messageSenders[f.id] = { 
-        name: f.fullname || f.username, 
-        avatar: f.avatar || '/img/default.png' 
-      };
-    }
-  });
-}
 
 // Sửa hàm loadFriendRequests (gọi /api/friends/requests/:userId)
 async function loadFriendRequests(userId) {
@@ -324,162 +301,101 @@ document.getElementById("unfriend-btn").addEventListener("click", async () => {
 // ----------------------------
 // Socket.io
 // ----------------------------
+// --- DÁN THAY THẾ CHO HÀM initSocket ---
 let socket;
 function initSocket(userId) {
-  // Kết nối socket.io với server (tự động detect server URL)
   const serverUrl = window.location.origin;
-  socket = io(serverUrl, {
-    transports: ['websocket', 'polling'], // Hỗ trợ cả websocket và polling
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionAttempts: 5
-  });
+  socket = io(serverUrl, { transports: ['websocket', 'polling'], reconnection: true });
 
   socket.on('connect', () => {
     console.log('✅ Socket connected:', socket.id);
-    // Đăng ký socket với userId
-    socket.emit('registerSocket', { userId });
-    // Join room để nhận tin nhắn
-    socket.emit("join", userId);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('❌ Socket disconnected');
-  });
-
-  socket.on('reconnect', (attemptNumber) => {
-    console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
-    // Đăng ký lại sau khi reconnect
     socket.emit('registerSocket', { userId });
     socket.emit("join", userId);
   });
 
-  socket.on('reconnect_error', (error) => {
-    console.error('⚠️ Socket reconnection error:', error);
+  socket.on('disconnect', () => console.log('❌ Socket disconnected'));
+
+  // --- 1. ONLINE / OFFLINE STATUS (Đã đưa vào đúng chỗ) ---
+  socket.on('getOnlineUsers', (onlineUserIds) => {
+    onlineUserIds.forEach(id => {
+      const dot = document.getElementById(`status-dot-${id}`);
+      if (dot) {
+        dot.style.backgroundColor = '#28a745'; // Xanh
+        dot.classList.add('online');
+      }
+    });
   });
 
-  socket.on('reconnect_failed', () => {
-    console.error('❌ Socket reconnection failed');
-    alert('Không thể kết nối lại với server. Vui lòng tải lại trang.');
+  socket.on('userOnline', (data) => {
+    const dot = document.getElementById(`status-dot-${data.userId}`);
+    if (dot) {
+      dot.style.backgroundColor = '#28a745'; // Xanh
+      dot.classList.add('online');
+    }
   });
 
-  socket.on('receiveMessage', (data) => {
-    console.log('📥 Received message:', data);
-
-    // Populate window.messageSenders
-    if (data.sender_id) {
-      window.messageSenders[data.sender_id] = window.messageSenders[data.sender_id] || {};
-      window.messageSenders[data.sender_id].name = data.sender_name || window.messageSenders[data.sender_id].name || window.currentReceiverName || 'User';
-      window.messageSenders[data.sender_id].avatar = data.avatar || window.messageSenders[data.sender_id].avatar;
+  socket.on('userOffline', (data) => {
+    const dot = document.getElementById(`status-dot-${data.userId}`);
+    if (dot) {
+      dot.style.backgroundColor = '#bbb'; // Xám
+      dot.classList.remove('online');
     }
+  });
 
-    // Fix avatar fallback (thêm fallback từ messageSenders và friendList)
-    const avatar = data.avatar || 
-                  window.messageSenders[data.sender_id]?.avatar || 
-                  window.friendList[data.sender_id]?.avatar || 
-                  window.currentReceiverAvatar || 
-                  '/img/default.png';
-
-    // Lưu tên người gửi
-    if (data.sender_name) {
-        window.messageSenders = window.messageSenders || {};
-        window.messageSenders[data.sender_id] = data.sender_name;
-    } else if (String(window.currentReceiverId) === String(data.sender_id)) {
-        window.messageSenders = window.messageSenders || {};
-        window.messageSenders[data.sender_id] = window.currentReceiverName;
-    }
-
-    // Nếu đang mở đúng cuộc chat thì append
+  // --- 2. TYPING (ĐANG SOẠN TIN) ---
+  socket.on('displayTyping', (data) => {
     if (String(window.currentReceiverId) === String(data.sender_id)) {
-        appendMessage(data.sender_id, data.message, avatar, data.created_at, data.id);
-    } else {
-        console.log('Tin nhắn mới từ', data.sender_id);
-    }
-  });
-
-  socket.on('messageSent', (data) => {
-    console.log('Message sent/confirmed', data);
-
-    const avatar = window.messageSenders[data.sender_id]?.avatar || window.currentUserAvatar || '/img/default.png';
-
-    if (String(window.currentReceiverId) === String(data.receiver_id)) {
-        appendMessage(data.sender_id, data.message, avatar, data.created_at, data.id);
-    }
-  });
-
-  // Real-time notifications cho friend requests
-  socket.on('newFriendRequest', async (data) => {
-    console.log('📬 New friend request received:', data);
-    // Tự động refresh friend requests
-    await loadFriendRequests();
-    // Hiển thị thông báo
-    const shouldView = confirm(`${data.message}\n\nBạn có muốn xem yêu cầu kết bạn không?`);
-    if (shouldView) {
-      // Chuyển sang tab Requests
-      const requestsTab = document.getElementById('Requests-tab');
-      if (requestsTab) {
-        requestsTab.click();
+      const statusEl = document.querySelector('.chat-status');
+      if (statusEl) {
+        statusEl.textContent = `${data.sender_name || 'Người dùng'} đang soạn tin...`;
+        statusEl.style.color = '#28a745';
+        statusEl.style.fontWeight = 'bold';
+        statusEl.style.fontStyle = 'italic';
+        statusEl.style.display = 'block';
       }
     }
   });
 
-  socket.on('friendRequestAccepted', async (data) => {
-    console.log(' Friend request accepted:', data);
-    alert(data.message);
-    // Refresh friend list
-    await loadFriends();
-  });
-
-  socket.on('friendListUpdated', async (data) => {
-    console.log(' Friend list updated:', data);
-    // Tự động refresh friend list và requests
-    await loadFriends();
-    await loadFriendRequests();
-  });
-// Khi người nhận từ chối lời mời
-socket.on("friendRequestRejected", async (data) => {
-  console.log(" Lời mời đã bị từ chối:", data);
-
-  // Là người gửi → refresh danh sách đang chờ + search
-  await loadFriendRequests();
-  await refreshSearchUI();
-  
-  const searchInput = document.querySelector(".msg-search input");
-  if (searchInput) {
-    const keyword = searchInput.value.trim();
-    await searchAndShowUsers(keyword);
-  }
-});
-
-// Khi người gửi hủy lời mời
-socket.on("friendRequestCanceled", async (data) => {
-  console.log(" Lời mời đã bị hủy:", data);
-
-  await loadFriendRequests();
-  await refreshSearchUI();
-
-  const searchInput = document.querySelector(".msg-search input");
-  if (searchInput) {
-    const keyword = searchInput.value.trim();
-    await searchAndShowUsers(keyword);
-  }
-});
-
-// Khi hủy kết bạn
-socket.on("unfriended", async (data) => {
-  console.log("Đã bị hủy kết bạn:", data);
-
-  await loadFriends();
-  await loadFriendRequests();
-  await refreshSearchUI();
-});
-
-  socket.on('error', (data) => {
-    console.error('Socket error:', data);
-    if (data.message) {
-      alert('Lỗi: ' + data.message);
+  socket.on('hideTyping', (data) => {
+    if (String(window.currentReceiverId) === String(data.sender_id)) {
+      const statusEl = document.querySelector('.chat-status');
+      if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.style.display = 'none';
+      }
     }
   });
+
+  // --- 3. TIN NHẮN & KẾT BẠN ---
+  socket.on('receiveMessage', (data) => {
+    console.log('📥 Received message:', data);
+    if (String(window.currentReceiverId) === String(data.sender_id)) {
+        const avatar = data.avatar || '/img/default.png'; 
+        appendMessage(data.sender_id, data.message, avatar, data.created_at, data.id);
+    }
+  });
+
+  socket.on('messageSent', (data) => {
+    if (String(window.currentReceiverId) === String(data.receiver_id)) {
+        const avatar = window.currentUserAvatar || '/img/default.png';
+        appendMessage(data.sender_id, data.message, avatar, data.created_at, data.id);
+    }
+  });
+
+  socket.on('newFriendRequest', async (data) => {
+    console.log('📬 New friend request:', data);
+    await loadFriendRequests();
+    if(confirm(`${data.message}\nBạn có muốn xem ngay?`)) {
+       const tab = document.getElementById('Requests-tab');
+       if(tab) tab.click();
+    }
+  });
+
+  socket.on('friendRequestAccepted', async () => { await loadFriends(); });
+  socket.on('friendListUpdated', async () => { await loadFriends(); await loadFriendRequests(); });
+  socket.on('unfriended', async () => { await loadFriends(); await loadFriendRequests(); });
+  
+  socket.on('error', (data) => console.error('Socket error:', data));
 }
 
 // ----------------------------
@@ -880,7 +796,7 @@ function openChatWith(receiverId, name, avatar) {
 
 // ----------------------------
 // Load danh sách bạn bè
-// ----------------------------
+// --- DÁN THAY THẾ CHO HÀM loadFriends ---
 async function loadFriends() {
   try {
     const res = await fetch(`/api/friends/list/${window.currentSenderId}`);
@@ -888,8 +804,7 @@ async function loadFriends() {
     const listEl = document.getElementById('chat-list-open');
     if (!listEl) return;
 
-    // Xóa hoàn toàn nội dung cũ
-    listEl.innerHTML = '';
+    listEl.innerHTML = ''; // Xóa danh sách cũ
 
     if (!friends || friends.length === 0) {
       listEl.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Chưa có bạn bè</p>';
@@ -904,29 +819,42 @@ async function loadFriends() {
       a.className = 'd-flex align-items-center friend-item';
       a.dataset.friendId = f.id;
       a.dataset.friendName = f.fullname || f.username;
-      // <<< QUAN TRỌNG: gán friendAvatar tại chỗ, tránh bị undefined sau này
       a.dataset.friendAvatar = f.avatar || '';
-
+      
       a.style.textDecoration = 'none';
       a.style.padding = '10px 12px';
       a.style.marginBottom = '8px';
       a.style.borderRadius = '8px';
       a.style.transition = 'all 0.3s ease';
 
+      // --- TẠO AVATAR VÀ CHẤM XANH ---
+      const avatarContainer = document.createElement('div');
+      avatarContainer.className = 'avatar-container me-2';
+      avatarContainer.style.position = 'relative'; // Quan trọng
+      avatarContainer.style.display = 'inline-block';
+
       const avatarEl = document.createElement('img');
-      // Nếu avatar là base64 thiếu prefix, thêm prefix (nếu bạn muốn)
-      let avatarSrc = f.avatar || '';
-      if (avatarSrc && /^(?:[A-Za-z0-9+/=\\s]+)$/.test(avatarSrc) && avatarSrc.length > 100 && !/^data:image/.test(avatarSrc)) {
+      let avatarSrc = f.avatar || '/img/default.png';
+      if (avatarSrc && avatarSrc.length > 50 && !avatarSrc.startsWith('data:image') && !avatarSrc.startsWith('/')) {
         avatarSrc = 'data:image/png;base64,' + avatarSrc;
       }
-      avatarEl.src = avatarSrc || '/img/default.png';
+      avatarEl.src = avatarSrc;
       avatarEl.style.width = "40px";
       avatarEl.style.height = "40px";
       avatarEl.style.borderRadius = "50%";
       avatarEl.style.objectFit = "cover";
-      avatarEl.className = "me-2";
-      // fallback nếu ảnh broken
       avatarEl.onerror = () => { avatarEl.src = '/img/default.png'; };
+
+      // Chấm trạng thái (Status Dot)
+      const statusDot = document.createElement('span');
+      statusDot.className = 'status-dot'; 
+      statusDot.id = `status-dot-${f.id}`; 
+      // Style cứng để đảm bảo hiện
+      statusDot.style.cssText = "position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; background-color: #bbb; border: 2px solid #fff; border-radius: 50%; transition: background-color 0.3s;";
+
+      avatarContainer.appendChild(avatarEl);
+      avatarContainer.appendChild(statusDot);
+      // -------------------------------
 
       const div = document.createElement('div');
       div.style.cssText = 'flex: 1; min-width: 0;';
@@ -935,35 +863,22 @@ async function loadFriends() {
         <p style="margin: 0; color: #999; font-size: 12px;">${escapeHtml(f.username || '')}</p>
       `;
 
-      a.appendChild(avatarEl);
+      a.appendChild(avatarContainer); // Append container thay vì img
       a.appendChild(div);
       fragment.appendChild(a);
     });
 
     listEl.appendChild(fragment);
 
-    // debug nhanh: in ra 3 friend đầu để kiểm tra dataset
-    try {
-      const firstThree = Array.from(listEl.querySelectorAll('.friend-item')).slice(0,3);
-      console.log('loadFriends: first items friendAvatar datasets:', firstThree.map(el => el.dataset.friendAvatar));
-    } catch (e) { /* ignore */ }
-
-    // Populate window.friendList từ friends
+    // Update data toàn cục
     window.friendList = friends.reduce((acc, f) => {
-      acc[f.id] = { 
-        name: f.fullname || f.username, 
-        avatar: f.avatar || '/img/default.png' 
-      };
+      acc[f.id] = { name: f.fullname || f.username, avatar: f.avatar || '/img/default.png' };
       return acc;
     }, {});
 
-    // Populate window.messageSenders (nếu chưa có)
     friends.forEach(f => {
       if (!window.messageSenders[f.id]) {
-        window.messageSenders[f.id] = { 
-          name: f.fullname || f.username, 
-          avatar: f.avatar || '/img/default.png' 
-        };
+        window.messageSenders[f.id] = window.friendList[f.id];
       }
     });
 
@@ -1024,14 +939,28 @@ async function loadFriendRequests() {
     leftDiv.style.cssText = 'display: flex; align-items: center; gap: 10px; flex: 1;';
     
     // Tạo avatar với chữ cái đầu
+    // --- BẮT ĐẦU SỬA AVATAR YÊU CẦU KẾT BẠN ---
     const avatarEl = document.createElement('img');
-    avatarEl.src = r.avatar || '/img/default.png';
+    
+    // 1. Xử lý Base64 thiếu prefix
+    let avatarSrc = r.avatar || '/img/default.png';
+    if (avatarSrc && avatarSrc.length > 50 && !avatarSrc.startsWith('data:image') && !avatarSrc.startsWith('/')) {
+      avatarSrc = 'data:image/png;base64,' + avatarSrc;
+    }
+    
+    avatarEl.src = avatarSrc;
     avatarEl.style.width = "36px";
     avatarEl.style.height = "36px";
     avatarEl.style.borderRadius = "50%";
     avatarEl.style.objectFit = "cover";
 
+    // 2. Thêm fallback khi ảnh lỗi (404)
+    avatarEl.onerror = () => { 
+        avatarEl.src = '/img/default.png'; 
+    };
+
     leftDiv.appendChild(avatarEl);
+    // --- KẾT THÚC SỬA ---
     
     const infoDiv = document.createElement('div');
     infoDiv.style.cssText = 'min-width: 0;';
@@ -1202,14 +1131,28 @@ async function searchAndShowUsers(keyword) {
     const leftDiv = document.createElement('div');
     leftDiv.style.cssText = 'display: flex; align-items: center; gap: 10px; flex: 1;';
 
-const avatarEl = document.createElement('img');
-avatarEl.src = u.avatar || '/img/default.png';
-avatarEl.style.width = "36px";
-avatarEl.style.height = "36px";
-avatarEl.style.borderRadius = "50%";
-avatarEl.style.objectFit = "cover";
-    leftDiv.appendChild(avatarEl);
+// --- BẮT ĐẦU ĐOẠN SỬA AVATAR SEARCH ---
+    const avatarEl = document.createElement('img');
+    
+    // 1. Xử lý logic Base64 bị thiếu đầu tố (giống loadFriends)
+    let avatarSrc = u.avatar || '/img/default.png';
+    if (avatarSrc && avatarSrc.length > 50 && !avatarSrc.startsWith('data:image') && !avatarSrc.startsWith('/')) {
+      avatarSrc = 'data:image/png;base64,' + avatarSrc;
+    }
+    
+    avatarEl.src = avatarSrc;
+    avatarEl.style.width = "36px";
+    avatarEl.style.height = "36px";
+    avatarEl.style.borderRadius = "50%";
+    avatarEl.style.objectFit = "cover";
+    
+    // 2. Thêm fallback nếu ảnh vẫn lỗi (404)
+    avatarEl.onerror = () => { 
+        avatarEl.src = '/img/default.png'; 
+    };
 
+    leftDiv.appendChild(avatarEl);
+    // --- KẾT THÚC ĐOẠN SỬA ---
     const infoDiv = document.createElement('div');
     infoDiv.style.cssText = 'min-width: 0;';
     infoDiv.innerHTML = `
@@ -1413,3 +1356,47 @@ async function unfriend(user_id, friend_id) {
     const keyword = input ? input.value.trim() : "";
     await searchAndShowUsers(keyword);
 }
+// --- THÊM VÀO TRONG HÀM initSocket ---
+
+  // --- DÁN VÀO TRONG HÀM initSocket (Thay thế đoạn cũ) ---
+
+  // 1. Khi nhận tín hiệu "Đang gõ"
+  socket.on('displayTyping', (data) => {
+    console.log("🔔 Đã nhận tín hiệu typing từ Server:", data); // DEBUG 1: Kiểm tra xem có nhận được không
+
+    const currentReceiverId = String(window.currentReceiverId);
+    const senderId = String(data.sender_id);
+
+    console.log(`🔍 So sánh: Đang chat với ID [${currentReceiverId}] vs Tín hiệu từ ID [${senderId}]`); // DEBUG 2
+
+    // Chỉ hiện nếu mình đang mở khung chat đúng với người đó
+    if (currentReceiverId === senderId) {
+      console.log("✅ ID Khớp! Tiến hành update giao diện..."); // DEBUG 3
+
+      const statusEl = document.querySelector('.chat-status');
+      
+      if (statusEl) {
+        statusEl.textContent = `${data.sender_name || 'Người dùng'} đang soạn tin...`;
+        statusEl.style.color = '#28a745'; // Màu xanh lá
+        statusEl.style.fontWeight = 'bold';
+        statusEl.style.fontStyle = 'italic';
+        statusEl.style.display = 'block'; // Đảm bảo không bị ẩn
+        console.log("✅ Đã set textContent thành công!"); // DEBUG 4
+      } else {
+        console.error("❌ LỖI: Không tìm thấy class HTML '.chat-status' trong file index.html");
+      }
+    } else {
+      console.log("⛔ Không update UI vì bạn đang không mở chat với người này.");
+    }
+  });
+
+  // 2. Khi nhận tín hiệu "Ngừng gõ"
+  socket.on('hideTyping', (data) => {
+    if (String(window.currentReceiverId) === String(data.sender_id)) {
+      const statusEl = document.querySelector('.chat-status');
+      if (statusEl) {
+        statusEl.textContent = ''; // Xóa chữ
+        statusEl.style.display = 'none'; // Ẩn đi cho gọn
+      }
+    }
+  });

@@ -1269,3 +1269,27 @@ button:focus {
     word-break: normal !important;
   }
 }
+/* Trạng thái Online/Offline */
+.status-dot {
+    height: 12px;
+    width: 12px;
+    background-color: #bbb; /* Mặc định màu xám (Offline) */
+    border-radius: 50%;
+    display: inline-block;
+    border: 2px solid #fff; /* Viền trắng cho nổi */
+    position: absolute; /* Để căn chỉnh đè lên avatar */
+    bottom: 0;
+    right: 0;
+    transition: background-color 0.3s ease;
+}
+
+.status-dot.online {
+    background-color: #28a745; /* Màu xanh lá (Online) */
+    box-shadow: 0 0 4px #28a745; /* Hiệu ứng phát sáng nhẹ */
+}
+
+/* Container avatar cần position relative để chấm tròn bám vào */
+.friend-item .avatar-container {
+    position: relative;
+    display: inline-block;
+}

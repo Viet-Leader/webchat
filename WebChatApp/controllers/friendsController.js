@@ -192,6 +192,7 @@ exports.getFriends = (req, res) => {
 };
 
 // (Optional) Get friend requests received by user (pending where user is target)
+// Get friend requests (SỬA: Đã có u.avatar, thêm fallback)
 exports.getFriendRequests = (req, res) => {
   const userId = req.params.userId;
   const sql = `
@@ -202,8 +203,17 @@ exports.getFriendRequests = (req, res) => {
     ORDER BY f.created_at DESC
   `;
   db.query(sql, [userId], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    if (err) {
+      console.error('Requests query error:', err);
+      return res.status(500).json({ error: err.message });
+    }
+
+    const requestsWithAvatar = rows.map(req => ({
+      ...req,
+      avatar: req.avatar || null  // ✅ Fallback null cho base64
+    }));
+
+    res.json(requestsWithAvatar);
   });
 };
 // Người nhận từ chối yêu cầu kết bạn
